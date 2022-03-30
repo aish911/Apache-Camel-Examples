@@ -1,0 +1,162 @@
+import java.util.ArrayList;
+import java.util.List;
+
+import org.apache.camel.component.cxf.CxfEndpoint;
+import org.apache.cxf.Bus;
+import org.apache.cxf.endpoint.Client;
+import org.apache.cxf.ext.logging.LoggingFeature;
+import org.apache.cxf.ext.logging.LoggingInInterceptor;
+import org.apache.cxf.ext.logging.LoggingOutInterceptor;
+import org.apache.cxf.frontend.ClientProxy;
+import org.apache.cxf.frontend.ClientProxyFactoryBean;
+import org.apache.cxf.interceptor.Interceptor;
+import org.apache.cxf.jaxws.JaxWsProxyFactoryBean;
+import org.apache.cxf.message.Message;
+import org.apache.cxf.transport.common.gzip.GZIPInInterceptor;
+import org.apache.cxf.transport.common.gzip.GZIPOutInterceptor;
+import org.apache.cxf.transport.http.HTTPConduit;
+import org.apache.cxf.transports.http.configuration.HTTPClientPolicy;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.Lazy;
+
+@Configuration
+public class WebServiceConfig {
+    @Value("${cxf.logging.enable}")
+    Boolean logenable;
+
+    @Value("${server.port}")
+    String port;
+
+    @Autowired
+    @Lazy
+    org.apache.cxf.ext.logging.LoggingFeature feature;
+
+    @Autowired
+    @Lazy
+    GZIPInInterceptor gzipInInterceptor;
+
+    @Autowired
+    @Lazy
+    GZIPOutInterceptor gzipOutInterceptor;
+
+    @Autowired
+    @Lazy
+    LoggingInInterceptor loggingInInterceptor;
+
+    @Autowired
+    @Lazy
+    LoggingOutInterceptor loggingOutInterceptor;
+
+    @Autowired
+    @Lazy
+    List<Interceptor<? extends Message>> inInterceptorList;
+
+    @Autowired
+    @Lazy
+    List<Interceptor<? extends Message>> outInterceptorList;
+
+    @Autowired
+    private Bus bus;
+
+
+    @Bean
+    LoggingFeature getLoggingFeature(){
+        LoggingFeature feature = new LoggingFeature();
+        feature.setPrettyLogging(true);
+        feature.setVerbose(true);
+        return feature;
+    }
+
+    @Bean
+    List<Interceptor<? extends Message>> getInInterceptorList(){
+        ArrayList<Interceptor<? extends Message>> arrayList = new ArrayList<Interceptor<? extends Message>>();
+        arrayList.add(gzipInInterceptor);
+        arrayList.add(loggingInInterceptor);
+        return arrayList;
+    }
+
+    @Bean
+    List<Interceptor<? extends Message>> getOutInterceptorList(){
+        ArrayList<Interceptor<? extends Message>> arrayList = new ArrayList<Interceptor<? extends Message>>();
+        arrayList.add(gzipOutInterceptor);
+        arrayList.add(loggingOutInterceptor);
+        return arrayList;
+    }
+
+    @Bean
+    LoggingInInterceptor getLoggingInInterceptor() {
+        LoggingInInterceptor in = new LoggingInInterceptor();
+        in.setPrettyLogging(true);
+        in.setLogBinary(true);
+        return in;
+    }
+
+    @Bean
+    LoggingOutInterceptor getLoggingOutInterceptor() {
+        LoggingOutInterceptor out = new LoggingOutInterceptor();
+        out.setPrettyLogging(true);
+        out.setLogBinary(true);
+        return out;
+    }
+
+    @Bean
+    GZIPInInterceptor getGzipInInterceptor(){
+        GZIPInInterceptor inGzip = new GZIPInInterceptor();
+        return inGzip;
+    }
+
+    @Bean
+    GZIPOutInterceptor getGzipOutInterceptor(){
+        GZIPOutInterceptor gzipOutInterceptor = new GZIPOutInterceptor();
+        return gzipOutInterceptor;
+    }
+
+
+    @Bean(name = "cXFEndpoint")
+    //@ConditionalOnProperty(prefix = "logging", name = "enable", havingValue = "true")
+    public org.apache.camel.component.cxf.CxfEndpoint exposeEndpoint() {
+
+        final CxfEndpoint cxfEndpoint = new CxfEndpoint();
+        cxfEndpoint.setAddress("{{url}}");
+        cxfEndpoint.setServiceClass("{{service class name}}");
+        cxfEndpoint.setWsdlURL("{{wsdl location}}");
+        cxfEndpoint.setEndpointName("{target_namespace}port_name_from_wsdl");
+        cxfEndpoint.setServiceName("{target_namespace}service_name_from_wsdl");
+        cxfEndpoint.setDefaultOperationNamespace("{{target_namespace}}");
+
+        if(logenable) {
+            System.out.println("$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$Inside Logging Enable");
+            cxfEndpoint.setLoggingFeatureEnabled(true);
+            cxfEndpoint.getFeatures().add(feature);
+            inInterceptorList.add(gzipInInterceptor);
+            inInterceptorList.add(loggingInInterceptor);
+            outInterceptorList.add(gzipOutInterceptor);
+            outInterceptorList.add(loggingOutInterceptor);
+
+            cxfEndpoint.setInInterceptors(inInterceptorList);
+            cxfEndpoint.setOutInterceptors(outInterceptorList);
+        }
+
+        return cxfEndpoint;
+
+    }
+
+   /* @Bean
+    public <T> T timeOut(){
+        ClientProxyFactoryBean proxyFactoryBean = new ClientProxyFactoryBean();
+        proxyFactoryBean.setAddress("{{url}}");
+        proxyFactoryBean.setServiceClass({{service_class}});
+        proxyFactoryBean.setBus(bus);
+        T ref = (T) proxyFactoryBean.create();
+        Client proxy = ClientProxy.getClient(ref);
+        HTTPConduit conduit = (HTTPConduit) proxy.getConduit();
+        HTTPClientPolicy policy = new HTTPClientPolicy();
+        policy.setConnectionTimeout(30000);
+        policy.setReceiveTimeout(30000);
+        conduit.setClient(policy);
+        return ref;
+    }*/
+}
